@@ -185,10 +185,7 @@ docker ps
 
 If you found this project helpful or want to collaborate, feel free to connect!
 
-**LinkedIn:** [Sayantan Samanta](https://www.linkedin.com/in/your-link-here)
+**LinkedIn:** [Sayantan Samanta](https://www.linkedin.com/in/sayantan-samanta/)
 
 ---
 
-This README is professional, complete, and ready for your public repo 🚀
-
----
