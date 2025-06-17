@@ -1,44 +1,60 @@
 FROM redhat/ubi9:latest
 
-# Install Python, pip, Ansible, and OpenSSH server
-RUN dnf -y update && \
-    dnf -y install \
-        python3 \
-        net-tools \
-        iputils \
-        python3-pip \
-        openssh-clients \
-        openssh-server \
+LABEL maintainer="sayantan2k21"
+
+# System cleanup and core tools
+RUN dnf clean all && \
+    dnf -y update && \
+    dnf install -y \
+        dnf-plugins-core \
         sudo \
-    && dnf clean all
+        git \
+        wget \
+        unzip \
+        yum-utils \
+        openssh \
+        openssh-server \
+        openssh-clients && \
+    dnf clean all
 
-# Install latest Ansible via pip
-RUN pip3 install --no-cache-dir ansible
+# Docker repo & install
+RUN dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo && \
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
+    dnf clean all
 
-# Create ansible user with sudo access
-RUN useradd -d /home/ansible -s /bin/bash ansible && \
-    echo "ansible ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    echo "ansible:ansible123" | chpasswd
+# Create Jenkins user and give access
+RUN useradd -m -s /bin/bash -d /var/lib/jenkins jenkins && \
+    echo "jenkins:jenkins123" | chpasswd && \
+    echo 'jenkins ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+    usermod -aG docker jenkins
 
-# Create SSH directory structure
-RUN mkdir -p /home/ansible/.ssh && \
-    chown ansible:ansible /home/ansible/.ssh && \
-    chmod 700 /home/ansible/.ssh && \
-    ssh-keygen -A
+# Jenkins repo and install
+RUN wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat/jenkins.repo && \
+    rpm --import https://pkg.jenkins.io/redhat/jenkins.io-2023.key && \
+    dnf upgrade -y && \
+    dnf install -y fontconfig java-21-openjdk jenkins  && \
+    dnf clean all
 
-# Configure SSHD for public key auth only
-RUN echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config && \
-    echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
-    echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
-    echo "AuthorizedKeysFile .ssh/authorized_keys" >> /etc/ssh/sshd_config
+# Set permissions for Jenkins WAR
+RUN chown jenkins:jenkins /usr/share/java/jenkins.war
 
-# Expose SSH port
-EXPOSE 22
+# SSH Configuration
+RUN ssh-keygen -A && \
+    mkdir -p /etc/ssh/sshd_config.d && \
+    echo "PermitRootLogin no" > /etc/ssh/sshd_config.d/custom.conf && \
+    echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config.d/custom.conf && \
+    echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config.d/custom.conf && \
+    echo "UsePAM yes" >> /etc/ssh/sshd_config.d/custom.conf
 
-# logged in user will be ansible
-# landing directory is /home/ansible
-USER ansible
-WORKDIR /home/ansible
+# Switch to Jenkins user
+USER jenkins
 
-# Default command: run SSH daemon
-CMD ["sudo","/usr/sbin/sshd", "-D"]
+# Jenkins workdir
+WORKDIR /var/lib/jenkins
+
+# Expose Jenkins + SSH
+EXPOSE 8080 50000 22
+
+
+# Start Jenkins as jenkins user
+ENTRYPOINT ["bash", "-c", "sudo dockerd & sleep 3 && sudo /usr/sbin/sshd && exec java -jar /usr/share/java/jenkins.war"]
