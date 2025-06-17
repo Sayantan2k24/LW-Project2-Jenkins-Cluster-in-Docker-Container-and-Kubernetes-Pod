@@ -17,7 +17,7 @@ This setup closely simulates a real-world Jenkins distributed build architecture
 
 ---
 
-##  ** App Source Code Repo **
+##  **App Source Code Repo**
 https://github.com/Sayantan2k24/flask-app-for-jenkins-docker-example.git
 
 ## 📌 **Tech Stack Used**
